@@ -5,6 +5,8 @@ All notable changes to `Privacy-Lockdown-LTSC2021` are documented in this file.
 
 ---
 
+## [1.6.3]
+
 ### Fixed
 
 * **Rollback redirection syntax:** Added missing escape characters before `>nul` in three rollback-generation lines within `EnsureKeyBackedUp`/`SetReg`.
