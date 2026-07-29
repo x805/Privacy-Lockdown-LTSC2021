@@ -10,6 +10,7 @@ All notable changes to `Privacy-Lockdown-LTSC2021` are documented in this file.
 ### Fixed
 
 * **Rollback redirection syntax:** Added missing escape characters before `>nul` in three rollback-generation lines within `EnsureKeyBackedUp`/`SetReg`.
+* **Last-run marker time truncation:** Added `delims=` to the timestamp capture for the `LastRunDate` marker; without it, `for /f`'s default space-delimited tokenization silently dropped everything after the date, recording only `yyyy-MM-dd` instead of the full date and time.
 * **Batch execution hijack defense:** Replaced `echo.` with `echo/` across 26 sites to defend against execution hijacking from files named `echo.exe`/`echo.bat` on the `PATH`.
 
 ### Added
