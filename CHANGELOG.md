@@ -1,103 +1,161 @@
 # Changelog
 
-All notable changes to `Privacy-Lockdown-LTSC2021` are documented here.
+All notable changes to `Privacy-Lockdown-LTSC2021` are documented in this file.
 
-## [1.6.2] - 2026-07-23
+
+---
+
+## [1.6.3]
 
 ### Fixed
-- **`:StopDisableSvc` localization bug** — service start-type detection previously
-  parsed `sc qc` console output for the `START_TYPE` label, which is localized on
-  non-English Windows builds and silently broke rollback's ability to restore a
-  service's original start type. Now reads the `Start` value directly as a
-  `REG_DWORD` from `HKLM\SYSTEM\CurrentControlSet\Services\<SvcName>`
-  (0=Boot, 1=System, 2=Automatic, 3=Manual, 4=Disabled), plus `DelayedAutostart`
-  for the Automatic (Delayed Start) case. Immune to display-language differences.
-- **Active user profile target miss** — when the script is elevated with secondary
-  Administrator credentials, `HKCU` targets the admin's own profile, and the
-  standard user's `NTUSER.DAT` is locked, so the offline `reg load` path skipped
-  them entirely until their next full logon. The script now also enumerates
-  already-mounted user hives directly under `HKU` (matched by SID) and applies
-  per-user settings to any of them immediately, in addition to the current
-  interactive user and the offline profile loop.
-- **Rollback path portability** — `rollback_privacy.bat` previously baked in this
-  run's absolute `%WORKDIR%`/`%REGBACKUP%` path for every `reg import` line,
-  breaking rollback if the `PrivacyLockdown_*` folder was later moved, renamed, or
-  copied to another machine. Backup file references now resolve via `%~dp0` at
-  rollback time instead.
-- **Rollback correctness for per-user hives** — related to the path-portability fix
-  above: `reg export`/`reg import` for offline and Default-template profile hives
-  targeted a `TempHive_<profile>` mount name that only exists for the duration of
-  the run that created it. Rollback now re-`reg load`s each profile's `NTUSER.DAT`
-  under that same mount name from inside `rollback_privacy.bat` before replaying
-  the recorded commands, then unloads it afterward, so rollback actually reaches
-  the real registry data instead of silently writing to a disconnected orphan key.
-- **Hardened profile-folder parsing** — the loop over `%SystemDrive%\Users\*`
-  round-tripped each folder name through a delayed-expansion variable
-  (`!PROFNAME!`), which corrupts if a folder name contains a literal `!`. This
-  logic was moved into a `:ProcessOfflineProfile` subroutine that uses `%~nx1`
-  argument substitution throughout instead, which isn't subject to that parsing
-  hazard.
-- **Unquoted registry data in `:SetReg`** — the `reg add` call passed `/d %~4`
-  unquoted, which fails for any string value containing spaces. Now `/d "%~4"`.
-
-### Changed
-- **`:DisableTask` performance** — replaced a per-task PowerShell
-  `Get-ScheduledTask` call with native `schtasks /query /tn "%~1" /fo CSV /nh`,
-  removing one PowerShell process spawn per task in the list. Known trade-off:
-  unlike `Get-ScheduledTask`'s `.State` enum, the `Status` column `schtasks`
-  prints is a localized display string, so on non-English builds this can miss
-  detecting an already-disabled task and cause rollback to re-enable it. This
-  does not affect the disable action itself, which relies on `schtasks`' exit
-  code, not this text.
+* **Rollback redirection syntax:** Added missing escape characters before `>nul` in three rollback-generation lines within `EnsureKeyBackedUp`/`SetReg`.
+* **Batch execution hijack defense:** Replaced `echo.` with `echo/` across 26 sites to defend against execution hijacking from files named `echo.exe`/`echo.bat` on the `PATH`.
 
 ### Added
-- **Cloud Clipboard**: `AllowCrossDeviceClipboard = 0` under
-  `HKLM\SOFTWARE\Policies\Microsoft\Windows\System`, disabling cross-device
-  clipboard sync/telemetry.
-- **News and Interests / Widgets**: `AllowNewsAndInterests = 0` under
-  `HKLM\SOFTWARE\Policies\Microsoft\Dsh`, disabling the background content feed.
-- **Edge Update tasks**: `\Microsoft\EdgeUpdate\EdgeUpdateTaskMachineCore` and
-  `\Microsoft\EdgeUpdate\EdgeUpdateTaskMachineUA` added to the scheduled-task
-  disable list.
+* **Orphaned hive cleanup:** Added automatic cleanup of orphaned `HKU\TempHive_*` registry hives at the end of every run.
+* **Rollback warning notice:** Added an explicit `REM` warning directly into `rollback_privacy.bat` noting that `HKCU` entries restore to whichever user account originally executed the script.
+* **Last-run registry marker:** Added writing of `LastRunVersion`, `LastRunDate`, and `LastRunResult` to `HKLM\SOFTWARE\Privacy-Lockdown-LTSC2021` upon successful completion.
+
+### Notes
+* **Final standalone release:** The lockdown-only script line ends here, with future development moving to the v1.7 unified toolkit.
+* No changes were made to hardening rules; all settings, services, scheduled tasks, and per-user changes are identical to v1.6.2.
+
+---
+
+## [1.6.2]
+
+### Fixed
+* **`:StopDisableSvc` localization bug:** Replaced parsing of localized `sc qc` console output with direct `REG_DWORD` reads from `HKLM\SYSTEM\CurrentControlSet\Services\<SvcName>`.
+* **Active user profile target miss:** Enumerated mounted user hives directly under `HKU` by SID to apply per-user settings immediately to active standard users when elevated under secondary administrator credentials.
+* **Rollback path portability:** Replaced hardcoded working directory paths with `%~dp0` in `rollback_privacy.bat`.
+* **Rollback correctness for per-user hives:** Added automatic `reg load` and `reg unload` calls for `NTUSER.DAT` files during rollback script execution.
+* **Hardened profile-folder parsing:** Refactored `%SystemDrive%\Users\*` folder loop into a subroutine using `%~nx1` argument substitution to prevent string corruption from delayed expansion variables containing exclamation marks.
+* **Unquoted registry data in `:SetReg`:** Enclosed `/d "%~4"` in quotes within `reg add` calls to support registry values containing spaces.
+
+### Changed
+* **`:DisableTask` performance:** Replaced per-task PowerShell invocations with native `schtasks /query /tn "%~1" /fo CSV /nh` calls.
+
+### Added
+* **Cloud Clipboard:** Added `AllowCrossDeviceClipboard = 0` under `HKLM\SOFTWARE\Policies\Microsoft\Windows\System`.
+* **News and Interests / Widgets:** Added `AllowNewsAndInterests = 0` under `HKLM\SOFTWARE\Policies\Microsoft\Dsh`.
+* **Edge Update tasks:** Added `EdgeUpdateTaskMachineCore` and `EdgeUpdateTaskMachineUA` to the scheduled-task disable list.
 
 ---
 
 ## [1.6.1]
 
 ### Changed
-- Windows Error Reporting is now **fully and permanently** disabled, with no
-  user-configurable option to leave it enabled.
-
-> Note: this entry reflects only what's confirmed by the in-script comments in
-> the 1.6.1 source. If 1.6.1 included other changes not documented in the code
-> itself, they aren't captured here — let me know if there's a prior
-> CHANGELOG.md or commit history to reconcile against.
+* **Windows Error Reporting:** Permanently disabled Windows Error Reporting across the board with no user option to leave it active.
 
 ---
 
 ## [1.6.0]
 
 ### Added
-- Rollback script (`rollback_privacy.bat`) generation switched to **incremental**
-  writes — each revert action is appended to the file as its corresponding
-  change is made, rather than assembled in memory and written once at the end.
-  This keeps rollback usable even if the script is interrupted partway through
-  (power loss, forced termination, etc.), since an end-of-run-only write would
-  leave the rollback file empty for a partial run.
-- **Rollback integrity check** at the end of each run: confirms
-  `rollback_privacy.bat` exists, is non-empty, wasn't truncated partway through
-  (disk space or antivirus interference), and reports how many revert actions it
-  contains.
+* **Incremental rollback generation:** Rebuilt `rollback_privacy.bat` creation to append revert actions incrementally as changes occur, ensuring usable rollbacks even if execution is interrupted mid-run.
+* **Rollback integrity check:** Validates at the end of a run that `rollback_privacy.bat` exists, is non-empty, wasn't truncated mid-write, and reports total revert actions.
+* **Per-action logging timestamps:** Added individual `[date time]` entries for every `SetReg`, `StopDisableSvc`, and `DisableTask` call.
 
-> Note: same caveat as above — this entry reflects only what's confirmed by the
-> in-script comments. There may be earlier or additional 1.6.0 changes not
-> captured here.
+### Notes
+* Closed out applicable suggestions from an independent review of v1.5.2.
 
 ---
 
-## Architectural constraints maintained across all versions above
-- Custom `:EnsureKeyBackedUp` logic for precise, state-accurate rollbacks.
-- Incremental `rollback_privacy.bat` generation (crash-safe).
-- Intentional exclusions left untouched: `PcaSvc`, Location Services, `SysMain`,
-  `WSearch`, Defender cloud protection (MAPS/SpyNet), and Windows Update
-  delivery components (BITS/wuauserv).
+> **Historical Note:** Versions 1.5.2 and older were developed and published in a previous repository. Their release history is preserved below for continuity, but their source code and binary assets are not hosted in this current repository tree.
+
+
+---
+
+## [1.5.2]
+
+### Fixed
+* **System Restore point pathing:** Switched System Restore point creation to `%SystemDrive%\` instead of hardcoded `C:\`.
+* **Service rollback queuing:** Suppressed `sc start` queuing during rollback for services that were already disabled prior to running the script.
+* **Domain-join detection:** Updated domain-join detection to a proper three-way status check (domain-joined / not domain-joined / inconclusive).
+
+### Added
+* **Defender status check:** Added a read-only startup check via `Get-MpComputerStatus` to verify real-time protection status.
+
+---
+
+## [1.5.0]
+
+### Fixed
+* **Delayed-auto service rollback:** Updated `:StopDisableSvc` to detect `(DELAYED)` AUTO_START services and restore them with `start= delayed-auto`.
+* **WER service state alignment:** Conditionalized `WerSvc` disabling on `WER_MODE` to allow local dumps when set to `LOCAL`.
+
+### Added
+* **Portable user-profile path:** Replaced hardcoded `C:\Users` with `%SystemDrive%\Users` across profile loops.
+* **Windows edition check:** Added startup check for EditionID to warn if non-Enterprise/Education/IoT builds clamp `AllowTelemetry=0`.
+* **`WER_MODE` toggle:** Added a top-level `WER_MODE` variable (`OFF` or `LOCAL`) to drive Windows Error Reporting behavior.
+* **Unattended `/quiet` flag:** Added `/quiet` flag to suppress pause prompts for automated SCCM/MDT deployment.
+* **Logon notes:** Clarified in the summary that offline `NTUSER.DAT` profile changes take effect at next logon.
+
+---
+
+## [1.4.2]
+
+### Added
+* **"Intentionally Left Alone" summary:** Added end-of-run summary detailing components deliberately untouched (e.g., `PcaSvc`, Location Services, `SysMain`, `WSearch`, Defender cloud protection, sync services, BITS/wuauserv).
+
+---
+
+## [1.4.0]
+
+### Fixed
+* **Profile hive cleanup whitespace handling:** Updated `reg query HKU` parsing from `tokens=1` to `tokens=*` to handle username folders containing spaces.
+* **Default profile template hardening:** Added explicit hardening step for `C:\Users\Default\NTUSER.DAT` so new user accounts inherit hardened settings.
+
+### Added
+* **AutoLogger ETW disabling:** Disabled `AutoLogger-Diagtrack-Listener` via registry (`Start=0`).
+* **Trace file cleanup:** Added one-time deletion of residual `.etl` trace files.
+* **PowerShell execution policy bypass:** Added `-ExecutionPolicy Bypass` to PowerShell invocations.
+
+---
+
+## [1.3.0]
+
+### Added
+* **PowerShell 7+ telemetry opt-out:** Configured `POWERSHELL_TELEMETRY_OPTOUT` environment variable via `:SetReg`.
+* **Edge policy addition:** Added `HideFirstRunExperience` policy for Microsoft Edge.
+* **Quick Verification summary:** Added end-of-run spot-check for `AllowTelemetry` and `DiagTrack` status.
+
+---
+
+## [1.2.0]
+
+### Fixed
+* **Rollback corruption fix (High Severity):** Replaced per-value backup triggering with single first-touch-per-key snapshotting (`:EnsureKeyBackedUp`).
+* **Scheduled task rollback accuracy:** Updated `:DisableTask` to query initial status before disabling to prevent re-enabling previously disabled tasks.
+* **Service detection rewrite:** Refactored `sc qc` parsing to target exact `START_TYPE` lines.
+* **Conditional rollback logging:** Restricted rollback entries to write only after `reg add` succeeds.
+
+### Added
+* **Orphaned hive cleanup pass:** Added end-of-run cleanup attempt for mounted `HKU\TempHive_*` keys.
+* **Domain-join detection:** Added startup warning if machine is domain-joined.
+
+---
+
+## [1.1.1]
+
+### Fixed
+* **Timestamp entropy:** Improved timestamp fallback entropy using `%RANDOM%%RANDOM%`.
+* **Documentation:** Added MIT license header, copyright notice, and SPDX identifier.
+
+---
+
+## [1.0.1]
+
+### Added
+* **Edge policies:** Added `StartupBoostEnabled`, `BackgroundModeEnabled`, `EdgeEnhanceImagesEnabled`, and `WebWidgetAllowed`.
+* **Service exclusions:** Explicitly configured low-risk consumer service targeting (`WalletService`, `PushToInstall`) while preserving core OS functionality.
+
+---
+
+## [1.0.0]
+
+### Added
+* **Initial public release:** Windows 10 IoT Enterprise LTSC 2021 Privacy Lockdown script.
+* **Core system privacy:** Enterprise telemetry reduction, disabling CEIP, WER, Activity History, Advertising ID, Cortana, Bing Search, Game DVR, and Spotlight.
+* **App hardening:** Microsoft Edge and Microsoft Office privacy policies, OneDrive GPO sync blocking.
+* **Backup & Rollback engine:** Automated restore point creation, registry key backup, and `rollback_privacy.bat` generation.
