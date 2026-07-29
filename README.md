@@ -1,6 +1,6 @@
 # Windows 10 IoT LTSC 2021 – Privacy Baseline
 
-![Version](https://img.shields.io/badge/Version-1.6.1-success.svg)
+![Version](https://img.shields.io/badge/Version-1.6.3-success.svg)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/Platform-Windows%2010%20IoT%20Enterprise%20LTSC%202021-lightgrey.svg)
 
@@ -13,6 +13,13 @@ It's built around three priorities, in this order: **safety first**, **real
 privacy gains second**, **never break core functionality third**. Every
 change is backed up before it's made, logged as it happens, and reversible
 with a single generated script.
+
+> **v1.6.3 is the final release of this standalone (lockdown-only) script
+> line.** Future development continues in a unified toolkit — the same
+> lockdown engine plus a read-only verification/audit mode, in one
+> menu-driven script — targeting v1.7. This script remains fully supported
+> for anyone who prefers a lockdown-only tool without the verification
+> component. See [Roadmap](#roadmap).
 
 ## Why this exists
 
@@ -38,6 +45,16 @@ or your active antivirus goes in at all — regardless of how it's framed.
   mid-write, and reports how many revert actions it contains. Catches a
   corrupted rollback file immediately instead of discovering it's broken
   later when you actually need it.
+- **Orphaned registry-hive cleanup** — sweeps for and unloads any
+  `HKU\TempHive_*` mount left behind by a failed `reg unload` (locked
+  file, antivirus interference) at the end of every run, so a stuck hive
+  can't silently block that profile from being processed again on a
+  future run.
+- **Last-run marker** *(new in 1.6.3)* — on successful completion, writes
+  `HKLM\SOFTWARE\Privacy-Lockdown-LTSC2021` with the version and timestamp
+  of the run. Doesn't affect anything else, isn't touched by rollback, and
+  is only there so you (or another tool) can tell at a glance when this
+  machine was last hardened.
 - **Full logging, with a timestamp on every individual action** — not just
   once at the top of the log file. Every registry write, service change,
   and task change gets its own `[date time]` entry, both on-screen (as
@@ -57,7 +74,8 @@ or your active antivirus goes in at all — regardless of how it's framed.
 - **Machine-wide (HKLM) policies**: telemetry level, Cortana/web search,
   advertising ID, Delivery Optimization (LAN-only, not fully off), Activity
   History/Timeline, input personalization, Game DVR, App Compat telemetry,
-  Windows Consumer Features/Spotlight, and PowerShell 7+'s telemetry opt-out.
+  Windows Consumer Features/Spotlight, Cross-Device (Cloud) Clipboard, News
+  and Interests/Widgets, and PowerShell 7+'s telemetry opt-out.
 - **Microsoft Edge** (auto-detected, skipped cleanly if not installed):
   usage/crash metrics, site-info sharing, ad personalization, feedback
   prompts, Do Not Track, Shopping Assistant, Collections, Startup Boost,
@@ -71,12 +89,15 @@ or your active antivirus goes in at all — regardless of how it's framed.
   full removal is planned for a future major version, see
   [Roadmap](#roadmap)).
 - **Scheduled tasks**: the full set of documented CEIP/Compatibility
-  Appraiser/Feedback/WER/Delivery-related telemetry tasks.
+  Appraiser/Feedback/WER/Delivery-related telemetry tasks, plus the Edge
+  Update tasks.
 - **Per-user settings, applied to every local profile** — not just the
   account running the script. Loads each user's `NTUSER.DAT` offline
   (skipping in-use/locked hives gracefully), including the **Default
-  profile template**, so accounts created *after* this script runs also
-  inherit hardened defaults.
+  profile template** (so accounts created *after* this script runs also
+  inherit hardened defaults), and also applies to any *already logged-on*
+  user's live-mounted hive under `HKU` (Fast User Switching, RDP sessions)
+  immediately rather than waiting for their next full logon.
 - **Low-risk consumer services**: Xbox-related services, Wallet, Push To
   Install.
 
@@ -105,7 +126,7 @@ as the same thing. Left untouched, on purpose:
 
 ## Usage
 
-1. Download `Privacy-Lockdown-LTSC2021-v1.6.1.bat` from the
+1. Download `Privacy-Lockdown-LTSC2021-v1.6.3.bat` from the
    [latest release](../../releases/latest).
 2. Right-click → **Run as administrator**.
 3. Review the on-screen output as it runs — every action is logged live,
@@ -123,7 +144,7 @@ For unattended/scripted deployment (SCCM, MDT, etc.), pass `/quiet` to
 suppress the "press any key" prompts — everything still logs normally:
 
 ```bat
-Privacy-Lockdown-LTSC2021-v1.6.1.bat /quiet
+Privacy-Lockdown-LTSC2021-v1.6.3.bat /quiet
 ```
 
 ### Rolling back
@@ -132,7 +153,11 @@ Run the generated `rollback_privacy.bat` (in the same
 `PrivacyLockdown_<timestamp>` folder) as Administrator. One exception: the
 AutoLogger `.etl` trace files deleted during the original run cannot be
 restored — this is flagged clearly in both the original run's output and
-the rollback script itself.
+the rollback script itself. If you ran the original script elevated under a
+*different* account than the one you normally use, note the warning printed
+at the top of `rollback_privacy.bat` — the per-user (`HKCU`) entries restore
+whichever account actually ran the lockdown script, not necessarily the one
+running the rollback.
 
 ### Windows Error Reporting
 
@@ -171,8 +196,16 @@ run. See [CHANGELOG.md](CHANGELOG.md) for version-specific upgrade notes
 
 ## Roadmap
 
-Larger, more invasive changes are being held for a future major version
-rather than folded into ongoing 1.x patches:
+**v1.6.3 is the final standalone release.** Development continues in a
+unified toolkit that combines this same lockdown engine with a new,
+read-only verification/audit mode (registry, services, tasks, live ETW
+state, DNS cache, and active network connections) behind a simple menu —
+targeting **v1.7**. The unified toolkit reads the `LastRunVersion`/
+`LastRunDate` marker this script already writes as of 1.6.3, so upgrading
+to it later doesn't lose that history.
+
+Larger, more invasive changes are being held for that release rather than
+folded into this 1.x line:
 
 - Full OneDrive removal (not just disabling auto-start/sync)
 - Under consideration: optional config-driven toggles for individual
