@@ -5,26 +5,28 @@ All notable changes to `Privacy-Lockdown-LTSC2021` are documented in this file.
 
 ---
 
-## [1.6.3]
-
 ### Fixed
+
 * **Rollback redirection syntax:** Added missing escape characters before `>nul` in three rollback-generation lines within `EnsureKeyBackedUp`/`SetReg`.
 * **Batch execution hijack defense:** Replaced `echo.` with `echo/` across 26 sites to defend against execution hijacking from files named `echo.exe`/`echo.bat` on the `PATH`.
 
 ### Added
-* **Orphaned hive cleanup:** Added automatic cleanup of orphaned `HKU\TempHive_*` registry hives at the end of every run.
+
 * **Rollback warning notice:** Added an explicit `REM` warning directly into `rollback_privacy.bat` noting that `HKCU` entries restore to whichever user account originally executed the script.
 * **Last-run registry marker:** Added writing of `LastRunVersion`, `LastRunDate`, and `LastRunResult` to `HKLM\SOFTWARE\Privacy-Lockdown-LTSC2021` upon successful completion.
 
 ### Notes
+
 * **Final standalone release:** The lockdown-only script line ends here, with future development moving to the v1.7 unified toolkit.
 * No changes were made to hardening rules; all settings, services, scheduled tasks, and per-user changes are identical to v1.6.2.
+* Orphaned `HKU\TempHive_*` hive cleanup was reviewed during this release and confirmed to already exist correctly in 1.6.2 - not a v1.6.3 change.
 
 ---
 
 ## [1.6.2]
 
 ### Fixed
+
 * **`:StopDisableSvc` localization bug:** Replaced parsing of localized `sc qc` console output with direct `REG_DWORD` reads from `HKLM\SYSTEM\CurrentControlSet\Services\<SvcName>`.
 * **Active user profile target miss:** Enumerated mounted user hives directly under `HKU` by SID to apply per-user settings immediately to active standard users when elevated under secondary administrator credentials.
 * **Rollback path portability:** Replaced hardcoded working directory paths with `%~dp0` in `rollback_privacy.bat`.
@@ -33,9 +35,11 @@ All notable changes to `Privacy-Lockdown-LTSC2021` are documented in this file.
 * **Unquoted registry data in `:SetReg`:** Enclosed `/d "%~4"` in quotes within `reg add` calls to support registry values containing spaces.
 
 ### Changed
+
 * **`:DisableTask` performance:** Replaced per-task PowerShell invocations with native `schtasks /query /tn "%~1" /fo CSV /nh` calls.
 
 ### Added
+
 * **Cloud Clipboard:** Added `AllowCrossDeviceClipboard = 0` under `HKLM\SOFTWARE\Policies\Microsoft\Windows\System`.
 * **News and Interests / Widgets:** Added `AllowNewsAndInterests = 0` under `HKLM\SOFTWARE\Policies\Microsoft\Dsh`.
 * **Edge Update tasks:** Added `EdgeUpdateTaskMachineCore` and `EdgeUpdateTaskMachineUA` to the scheduled-task disable list.
